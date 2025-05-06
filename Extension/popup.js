@@ -61,15 +61,6 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
 
-  // Create hidden file input for imports
-  const importInput = document.createElement('input');
-  importInput.type = 'file';
-  importInput.id = 'importFile';
-  importInput.accept = '.json';
-  importInput.style.display = 'none';
-  importInput.addEventListener('change', handleFileImport);
-  document.body.appendChild(importInput);
-});
 
 // Helper function to show messages
 function showMessage(text, color) {
