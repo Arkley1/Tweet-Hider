@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       document.getElementById('autoCollectUsers').checked = result.autoCollectUsers !== false;
     }
-  );
+  )});
 
   // Save blocked words when save button is clicked
   document.getElementById('saveButton').addEventListener('click', function() {
