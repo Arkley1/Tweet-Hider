@@ -60,13 +60,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Export block lists
-  document.getElementById('exportButton').addEventListener('click', exportBlockLists);
-  
-  // Import block lists
-  document.getElementById('importButton').addEventListener('click', function() {
-    document.getElementById('importFile').click();
-  });
 
   // Create hidden file input for imports
   const importInput = document.createElement('input');
