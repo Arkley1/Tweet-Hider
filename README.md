@@ -38,5 +38,3 @@ You can update your lists directly in the extension’s settings:
 - **Word List:** Input keywords that should trigger a tweet to be hidden, whether they appear in tweet text or within links.
 
 
-## Contributing
-Contributions are welcome! If you'd like to help improve Tweet Filter, please open an issue or submit a pull request to discuss changes and improvements.
