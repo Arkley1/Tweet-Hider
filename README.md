@@ -6,6 +6,9 @@ Tweet Hider is a Chrome extension designed to give you more control over your Tw
 ## Prerequisites
 - A Chromium-based browser (such as Google Chrome, Microsoft Edge, or Opera)
 
+## Download
+<a href="https://github.com/Arkley1/Tweet-Hider/releases" target="_blank"><b>Download latest build</b></a>
+
 ## Installation
 1. Open Chrome and navigate to `chrome://extensions/`
 2. Enable **Developer mode** in the top right corner.
