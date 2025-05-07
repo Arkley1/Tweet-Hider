@@ -9,11 +9,13 @@ Tweet Hider is a Chrome extension designed to give you more control over your Tw
 ## Download
 <a href="https://github.com/Arkley1/Tweet-Hider/releases" target="_blank"><b>Download latest build</b></a>
 
+
 ## Installation
-1. Open Chrome and navigate to `chrome://extensions/`
-2. Enable **Developer mode** in the top right corner.
-3. Click **Load unpacked** and select the `extension` directory from this project.
-4. Once loaded, the extension icon will appear in your Chrome toolbar.
+1. Extract the downloaded file.
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable **Developer mode** in the top right corner.
+4. Click **Load unpacked** and select the `extension` directory from this project.
+5. Once loaded, the extension icon will appear in your Chrome toolbar.
 
 ## Features
 - **User-Based Filtering:** Automatically hide all tweets from users whose usernames are listed in your filter.
