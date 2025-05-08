@@ -1,29 +1,57 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Twitter Word Hider</title>
+  <title>Tweet Hider</title>
   <style>
     body {
-      width: 350px;
-      padding: 10px;
+      width: 300px;
+      padding: 12px;
       font-family: Arial, sans-serif;
+      font-size: 14px;
+    }
+    textarea {
+      resize: none;
     }
     h2 {
-      margin-top: 0;
+      margin: 0 0 12px 0;
+      font-size: 16px;
       color: #1DA1F2;
     }
     .section {
-      margin-bottom: 15px;
+      margin-bottom: 12px;
     }
     .section-title {
       font-weight: bold;
-      margin-bottom: 5px;
+      margin-bottom: 6px;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .checkbox-row input {
+      margin-right: 8px;
+    }
+    .wordlists {
+      display: flex;
+      gap: 10px;
+    }
+    .wordlist-column {
+      flex: 1;
     }
     textarea {
       width: 100%;
-      height: 80px;
-      margin-bottom: 5px;
+      height: 100px;
+      box-sizing: border-box;
+      padding: 6px;
       font-family: Arial, sans-serif;
+      font-size: 13px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .separator {
+      width: 1px;
+      background: #eee;
     }
     button {
       background-color: #1DA1F2;
@@ -33,55 +61,48 @@
       border-radius: 4px;
       cursor: pointer;
       width: 100%;
+      font-weight: bold;
+      margin-top: 8px;
     }
-    .info {
+    .save-message {
+      color: green;
+      margin-top: 8px;
       font-size: 12px;
-      color: #666;
-      margin-top: 5px;
-    }
-    .stats {
-      margin-top: 15px;
-      padding: 10px;
-      background-color: #f8f8f8;
-      border-radius: 4px;
-      font-size: 12px;
-    }
-    .stats p {
-      margin: 5px 0;
+      text-align: center;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h2>Twitter Word Blocker</h2>
-  <div class="section">
-  <div class="section-title">Hide these user accounts:</div>
-  <textarea id="blockedUsers" placeholder="Example:&#10;spamuser1&#10;fakeaccount2"></textarea>
-  <div class="info">Enter one username per line (without @)</div>
-</div>
-
-<div class="section">
-  <label>
-    <input type="checkbox" id="enableUserBlocking"> 
-    Enable user account blocking
-  </label>
-</div>
-
-  <div class="section">
-    <div class="section-title">Hide tweets with these words anywhere:</div>
-    <textarea id="generalBlockedWords" placeholder="Example:&#10;nsfw&#10;porn&#10;xxx"></textarea>
-    <div class="info">Blocks if these words appear anywhere in the tweet.</div>
+  <h2>Tweet Hider</h2>
+  
+  <div class="checkbox-row">
+    <input type="checkbox" id="enableUserBlocking">
+    <label for="enableUserBlocking">Hide tweets from these users:</label>
   </div>
   
   <div class="section">
-    <div class="section-title">Hide tweets with these words in links:</div>
-    <textarea id="linkBlockedWords" placeholder="Example:&#10;dood&#10;vidbe&#10;jav"></textarea>
-    <div class="info">Only blocks if these words appear in URLs.</div>
+    <textarea id="blockedUsers" placeholder="Enter usernames (one per line)&#10;Example:&#10;spamuser1&#10;fakeaccount2"></textarea>
+  </div>
+
+  <div class="section">
+    <div class="wordlists">
+      <div class="wordlist-column">
+        <div class="section-title">Hide tweets containing:</div>
+        <textarea id="generalBlockedWords" placeholder="Example:&#10;nsfw&#10;porn&#10;spoiler&#10;xxx"></textarea>
+      </div>
+      <div class="separator"></div>
+      <div class="wordlist-column">
+        <div class="section-title">Hide links containing:</div>
+        <textarea id="linkBlockedWords" placeholder="Example:&#10;dood&#10;linktr&#10;shorturl"></textarea>
+      </div>
+    </div>
   </div>
   
 <div class="section">
   <label>
     <input type="checkbox" id="autoCollectUsers" checked>
-    Automatically block users who post blocked words
+    Automatically hide users who post blocked words
   </label>
 </div>
 
@@ -90,7 +111,7 @@
   <div class="stats">
     <p>The number of hidden tweets will appear in the bottom-right corner of Twitter.</p>
     <p>Counter resets when you refresh the page.</p>
-    <p>Refresh Twitter after saving to apply changes.</p>
+    <p>Refresh X/Twitter after saving to apply changes.</p>
   </div>
   
   <script src="popup.js"></script>
