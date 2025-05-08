@@ -1,8 +1,9 @@
-let generalBlockedWords = []; // Tweet word blocklist
-let linkBlockedWords = []; // Tweet link word blocklist
-let blockedUsers = []; // Username blocklist
+let generalBlockedWords = [];
+let notificationTimeout;
+let linkBlockedWords = [];
+let blockedUsers = [];
 let enableUserBlocking = false;
-let debugMode = false; // Debug mode for output console.log
+let debugMode = false;
 let hiddenTweetCount = 0;
 let autoCollectUsers = true;
 let collectedUsers = []; // Track users we've found
@@ -13,7 +14,12 @@ function debugLog(...args) {
   }
 }
 
-// Show tweet block count
+function isTwitterDomain(url) {
+  return (
+    url.includes("twitter.com") || url.includes("x.com") || url.startsWith("/")
+  );
+}
+
 function updateCounterDisplay() {
   let counterEl = document.getElementById("tweet-blocker-counter");
 
@@ -40,7 +46,6 @@ function updateCounterDisplay() {
   counterEl.textContent = `Blocked: ${hiddenTweetCount}`;
 }
 
-// Hide Tweet
 function hideTweets() {
   const tweets = document.querySelectorAll('article[data-testid="tweet"]');
   let newlyHidden = 0;
@@ -114,14 +119,43 @@ function hideTweets() {
       const links = tweet.querySelectorAll("a[href]");
       for (const link of links) {
         const href = (link.getAttribute("href") || "").toLowerCase();
-        for (const word of linkBlockedWords) {
-          if (href.includes(word.toLowerCase())) {
-            shouldHide = true;
-            matchedWord = word;
-            matchType = "link word match";
-            break;
-          }
+
+        // Skip profile links and Twitter's own domains
+        if (
+          href.startsWith("/") ||
+          href.includes("twitter.com") ||
+          href.includes("x.com")
+        ) {
+          continue;
         }
+
+        // Enhanced URL parsing
+        try {
+          const url = new URL(
+            href.startsWith("http") ? href : `https://${href}`,
+          );
+          const urlStr = url.href.toLowerCase();
+          const urlPath = url.pathname.toLowerCase();
+          const urlHost = url.hostname.toLowerCase();
+
+          for (const word of linkBlockedWords) {
+            const lowerWord = word.toLowerCase();
+            // Check in entire URL, path segments, or domain parts
+            if (
+              urlStr.includes(lowerWord) ||
+              urlPath.includes(lowerWord) ||
+              urlHost.includes(lowerWord)
+            ) {
+              shouldHide = true;
+              matchedWord = word;
+              matchType = "link word match";
+              break;
+            }
+          }
+        } catch (e) {
+          console.log("Error parsing URL:", href, e);
+        }
+
         if (shouldHide) break;
       }
     }
@@ -136,7 +170,7 @@ function hideTweets() {
       // AUTO-COLLECT USERNAMES
       if (autoCollectUsers && matchType.includes("word match")) {
         const userElement = tweet.querySelector(
-          '[data-testid="User-Name"] a[href^="/"]'
+          '[data-testid="User-Name"] a[href^="/"]',
         );
         if (userElement) {
           const username = userElement.getAttribute("href").split("/")[1];
@@ -151,7 +185,7 @@ function hideTweets() {
                   },
                   () => {
                     debugLog(`Auto-added @${username} to blocked users`);
-                  }
+                  },
                 );
               }
             });
@@ -198,7 +232,7 @@ function loadBlockedWords() {
       "linkBlockedWords",
       "blockedUsers",
       "enableUserBlocking",
-      "autoCollectUsers"
+      "autoCollectUsers",
     ],
     function (result) {
       generalBlockedWords = result.generalBlockedWords || [];
@@ -212,13 +246,13 @@ function loadBlockedWords() {
         linkBlockedWords,
         blockedUsers,
         enableUserBlocking,
-        autoCollectUsers
+        autoCollectUsers,
       });
 
       hideTweets();
       observeTwitterFeed();
       updateCounterDisplay();
-    }
+    },
   );
 }
 
@@ -232,3 +266,103 @@ document.addEventListener("visibilitychange", function () {
     hideTweets();
   }
 });
+
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "userBlocked") {
+    // Clear any existing notification timeout
+    if (notificationTimeout) clearTimeout(notificationTimeout);
+
+    // Update local blockedUsers array
+    if (!blockedUsers.includes(message.username)) {
+      blockedUsers.push(message.username);
+      hiddenTweetCount++; // Increment counter for the immediate block
+      updateCounterDisplay();
+
+      // Re-run hiding to catch tweets from newly blocked user
+      hideTweets();
+
+      // Show a notification to the user
+      const existingNotification = document.querySelector(
+        ".block-notification",
+      );
+      if (existingNotification) existingNotification.remove();
+
+      const notification = document.createElement("div");
+      notification.textContent = `✓ @${message.username} blocked`;
+      notification.className = "block-notification";
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background-color: #1da1f2;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-weight: bold;
+        z-index: 9999;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        animation: fadeIn 0.3s;
+      `;
+
+      document.body.appendChild(notification);
+
+      // Remove notification after 3 seconds
+      notificationTimeout = setTimeout(() => {
+        notification.style.animation = "fadeOut 0.5s";
+        setTimeout(() => notification.remove(), 500);
+      }, 3000);
+    }
+  }
+
+  if (message.action === "forceUpdateBlockLists") {
+    generalBlockedWords = message.data.generalBlockedWords;
+    linkBlockedWords = message.data.linkBlockedWords;
+    blockedUsers = message.data.blockedUsers;
+    enableUserBlocking = message.data.enableUserBlocking;
+    autoCollectUsers = message.data.autoCollectUsers;
+
+    debugLog("Received forced update:", message.data);
+    hideTweets(); // Re-process all tweets immediately
+
+    // Show brief notification
+    const notice = document.createElement("div");
+    notice.textContent = "Block lists updated";
+    notice.style.cssText = `
+      position: fixed;
+      bottom: 60px;
+      right: 20px;
+      background: #1da1f2;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      z-index: 9999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      animation: fadeInOut 2.5s;
+    `;
+    document.body.appendChild(notice);
+    setTimeout(() => notice.remove(), 2500);
+  }
+});
+
+// Add this CSS for animations
+const style = document.createElement("style");
+style.textContent = `
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(10px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(10px); }
+  }
+`;
+document.head.appendChild(style);
