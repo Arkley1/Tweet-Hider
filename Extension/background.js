@@ -4,7 +4,7 @@ chrome.runtime.onInstalled.addListener(() => {
   // Create the context menu item for blocking usernames
   chrome.contextMenus.create({
     id: "blockUsername",
-    title: "Block this user",
+    title: "Hide this user",
     contexts: ["link"],
     documentUrlPatterns: ["https://twitter.com/*", "https://x.com/*"]
   });

@@ -3,7 +3,7 @@ let notificationTimeout;
 let linkBlockedWords = [];
 let blockedUsers = [];
 let enableUserBlocking = false;
-let debugMode = false;
+let debugMode = true;
 let hiddenTweetCount = 0;
 let autoCollectUsers = true;
 let collectedUsers = []; // Track users we've found
@@ -114,49 +114,59 @@ function hideTweets() {
       }
     }
 
-    // 3. LINK WORD BLOCKING (if not already hidden)
     if (!shouldHide && linkBlockedWords.length > 0) {
+      // Get both visible links and tweet text (which might contain links)
       const links = tweet.querySelectorAll("a[href]");
+      const tweetText = tweet.textContent || "";
+
+      // First check visible links
       for (const link of links) {
         const href = (link.getAttribute("href") || "").toLowerCase();
 
-        // Skip profile links and Twitter's own domains
-        if (
-          href.startsWith("/") ||
-          href.includes("twitter.com") ||
-          href.includes("x.com")
-        ) {
+        // Skip profile links
+        if (href.startsWith("/") && !href.includes("/status/")) {
           continue;
         }
 
-        // Enhanced URL parsing
-        try {
-          const url = new URL(
-            href.startsWith("http") ? href : `https://${href}`,
-          );
-          const urlStr = url.href.toLowerCase();
-          const urlPath = url.pathname.toLowerCase();
-          const urlHost = url.hostname.toLowerCase();
-
-          for (const word of linkBlockedWords) {
-            const lowerWord = word.toLowerCase();
-            // Check in entire URL, path segments, or domain parts
-            if (
-              urlStr.includes(lowerWord) ||
-              urlPath.includes(lowerWord) ||
-              urlHost.includes(lowerWord)
-            ) {
-              shouldHide = true;
-              matchedWord = word;
-              matchType = "link word match";
-              break;
-            }
+        for (const word of linkBlockedWords) {
+          const lowerWord = word.toLowerCase();
+          // Check if link contains the word
+          if (href.includes(lowerWord)) {
+            shouldHide = true;
+            matchedWord = word;
+            matchType = "link word match (href)";
+            break;
           }
-        } catch (e) {
-          console.log("Error parsing URL:", href, e);
         }
-
         if (shouldHide) break;
+      }
+
+      // If not hidden yet, check for links in the text (t.co links, etc.)
+      if (!shouldHide) {
+        // Common URL patterns in tweets
+        const urlPatterns = [
+          /https?:\/\/t\.co\/\w+/gi, // t.co shortened links
+          /https?:\/\/\S+/gi, // any URL
+        ];
+
+        for (const pattern of urlPatterns) {
+          const matches = tweetText.match(pattern);
+          if (!matches) continue;
+
+          for (const url of matches) {
+            for (const word of linkBlockedWords) {
+              const lowerWord = word.toLowerCase();
+              if (url.toLowerCase().includes(lowerWord)) {
+                shouldHide = true;
+                matchedWord = word;
+                matchType = "link word match (text)";
+                break;
+              }
+            }
+            if (shouldHide) break;
+          }
+          if (shouldHide) break;
+        }
       }
     }
 
@@ -222,6 +232,35 @@ function observeTwitterFeed() {
     setTimeout(observeTwitterFeed, 1000);
   }
 }
+
+function inspectTweetForDebugging(tweetId) {
+  const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+  tweets.forEach(tweet => {
+    // Check if this is the tweet we're looking for
+    const links = tweet.querySelectorAll("a[href]");
+    let foundMatch = false;
+    
+    links.forEach(link => {
+      const href = link.getAttribute("href") || "";
+      if (href.includes(tweetId)) {
+        foundMatch = true;
+        console.log("FOUND TARGET TWEET:", tweet);
+        console.log("Tweet content:", tweet.textContent);
+        console.log("Links in tweet:");
+        
+        tweet.querySelectorAll("a[href]").forEach(l => {
+          console.log("  Link:", l.getAttribute("href"));
+        });
+        
+        // Highlight the tweet for visual identification
+        tweet.style.border = "3px solid red";
+      }
+    });
+  });
+}
+
+// Call this with the tweet ID you want to inspect
+// e.g., inspectTweetForDebugging("1919766745725993286");
 
 function loadBlockedWords() {
   hiddenTweetCount = 0;
