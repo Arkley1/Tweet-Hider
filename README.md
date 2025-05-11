@@ -29,8 +29,9 @@ Tweet Hider is a Chrome extension designed to give you more control over your Tw
    - **Username Filter Toggle:** Enable or disable filtering based on the username list.
    - **Dynamic Addition Toggle:** Enable or disable the automatic addition of users when their tweets are hidden.
 3. Enter the usernames and keywords/phrases you want to filter, then click **Save** to apply your settings.
-4. Refresh your Twitter (X) page.
-5. Browse Twitter as usual—the extension will automatically filter out tweets based on your criteria.
+4. If you want to manualy add user to userlist, you can right click on the username name and select **Hide this user** on the menu list.
+5. Refresh your Twitter (X) page.
+6. Browse Twitter as usual—the extension will automatically filter out tweets based on your criteria.
 
 ## Configuration
 You can update your lists directly in the extension’s settings:
