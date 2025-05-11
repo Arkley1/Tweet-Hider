@@ -71,14 +71,54 @@
       text-align: center;
       font-weight: bold;
     }
+	
+	.language-selector {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    font-size: 14px;
+  }
+  .language-label {
+    margin-right: 8px;
+    color: #555;
+  }
+  .language-options {
+    display: flex;
+    align-items: center;
+  }
+  .language-option {
+    padding: 3px 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    color: #888;
+  }
+  .language-option.active {
+    color: #1DA1F2;
+    font-weight: bold;
+  }
+  .language-option:hover:not(.active) {
+    background-color: #f0f0f0;
+  }
+  .language-divider {
+    margin: 0 8px;
+    color: #ccc;
+  }
   </style>
 </head>
 <body>
+  <div class="language-selector">
+  <span class="language-label" id="LanguageLabel">Language:</span>
+  <div class="language-options">
+    <span id="lang-en" class="language-option active">English</span>
+    <span class="language-divider">|</span>
+    <span id="lang-id" class="language-option">Bahasa Indonesia</span>
+  </div>
+</div>
   <h2>Tweet Hider</h2>
   
   <div class="checkbox-row">
     <input type="checkbox" id="enableUserBlocking">
-    <label for="enableUserBlocking">Hide tweets from these users:</label>
+    <label for="enableUserBlocking" id="userBlockingLabel">Hide tweets from these users:</label>
   </div>
   
   <div class="section">
@@ -100,16 +140,13 @@
   </div>
   
 <div class="section">
-  <label>
     <input type="checkbox" id="autoCollectUsers" checked>
-    Automatically hide users who post blocked words
-  </label>
+    <label for="autoCollectUsers" id="autoCollectUsersLabel">Automatically hide users who post blocked words</label>
 </div>
 
   <button id="saveButton">Save Changes</button>
   
   <div class="stats">
-    <p>The number of hidden tweets will appear in the bottom-right corner of Twitter.</p>
     <p>Counter resets when you refresh the page.</p>
     <p>Refresh X/Twitter after saving to apply changes.</p>
   </div>

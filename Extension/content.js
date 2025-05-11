@@ -3,7 +3,7 @@ let notificationTimeout;
 let linkBlockedWords = [];
 let blockedUsers = [];
 let enableUserBlocking = false;
-let debugMode = true;
+let debugMode = false; // For output console log
 let hiddenTweetCount = 0;
 let autoCollectUsers = true;
 let collectedUsers = []; // Track users we've found
@@ -26,7 +26,7 @@ let currentLang = "en"; // Default language
 
 function debugLog(...args) {
   if (debugMode) {
-    console.log("[Twitter Word Blocker]", ...args);
+    console.log("[Tweet Hider]", ...args);
   }
 }
 
@@ -62,160 +62,176 @@ function updateCounterDisplay() {
   counterEl.textContent = `${translations[currentLang].blockedCounter}${hiddenTweetCount}`;
 }
 
+// Tweet Hide Filter
 function hideTweets() {
-  const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+  const tweets = document.querySelectorAll(
+    'article[data-testid="tweet"]:not([data-processed="true"])',
+  );
   let newlyHidden = 0;
 
-  tweets.forEach((tweet) => {
-    if (tweet.dataset.processed === "true") return;
+  debugLog(`Checking ${tweets.length} new tweets`);
 
-    let shouldHide = false;
-    let matchedWord = "";
-    let matchType = "";
+  const processTweetBatch = (startIndex, batchSize) => {
+    const endIndex = Math.min(startIndex + batchSize, tweets.length);
 
-    // 1. USERNAME BLOCKING CHECK
-    if (enableUserBlocking && blockedUsers.length > 0) {
-      // Check all possible username elements
-      const usernameElements = [
-        ...tweet.querySelectorAll('span[data-testid="User-Name"] span'), // New Twitter UI
-        ...tweet.querySelectorAll('a[href*="/"]'), // Profile links
-        ...tweet.querySelectorAll('div[data-testid="User-Name"]'), // Old Twitter UI
-      ];
+    for (let i = startIndex; i < endIndex; i++) {
+      const tweet = tweets[i];
+      tweet.dataset.processed = "true";
 
-      for (const element of usernameElements) {
-        const text = element.textContent || "";
-        const href = element.getAttribute("href") || "";
+      const hiddenByUsername = shouldHideByUsername(tweet);
+      const hiddenByGeneralWords = shouldHideByGeneralWords(tweet);
+      const hiddenByLinkWords = shouldHideByLinkWords(tweet);
 
-        // Extract username from @mention text
-        if (text.includes("@")) {
-          const usernameMatch = text.match(/@(\w+)/i);
-          if (usernameMatch) {
-            const username = usernameMatch[1].toLowerCase();
-            if (blockedUsers.includes(username)) {
-              shouldHide = true;
-              matchedWord = username;
-              matchType = "username text match";
-              break;
-            }
-          }
-        }
-
-        // Extract username from profile URL
-        if (
-          href.startsWith("/") &&
-          !href.includes("/status/") &&
-          href.split("/").length === 2
-        ) {
-          const username = href.split("/")[1].toLowerCase();
-          if (blockedUsers.includes(username)) {
-            shouldHide = true;
-            matchedWord = username;
-            matchType = "profile URL match";
-            break;
-          }
+      if (hiddenByUsername || hiddenByGeneralWords || hiddenByLinkWords) {
+        if (tweet.style.display !== "none") {
+          tweet.style.display = "none";
+          newlyHidden++;
         }
       }
     }
 
-    // 2. GENERAL WORD BLOCKING (if user not blocked)
-    if (!shouldHide && generalBlockedWords.length > 0) {
-      const tweetText = (tweet.textContent || "").toLowerCase();
-      for (const word of generalBlockedWords) {
-        if (tweetText.includes(word.toLowerCase())) {
-          shouldHide = true;
-          matchedWord = word;
-          matchType = "general word match";
-          break;
-        }
+    if (endIndex < tweets.length) {
+      (window.requestIdleCallback || setTimeout)(() => {
+        processTweetBatch(endIndex, batchSize);
+      });
+    } else if (newlyHidden > 0) {
+      hiddenTweetCount += newlyHidden;
+      updateCounterDisplay();
+    }
+  };
+
+  if (tweets.length > 0) {
+    processTweetBatch(0, 10);
+  }
+}
+
+// Helper function to get username from tweet
+function getUsernameFromTweet(tweet) {
+  const userElement = tweet.querySelector(
+    '[data-testid="User-Name"] a[href^="/"]',
+  );
+  return userElement ? userElement.getAttribute("href").split("/")[1] : null;
+}
+
+// Filter by Username
+function shouldHideByUsername(tweet) {
+  if (!enableUserBlocking || blockedUsers.length === 0) return false;
+
+  // Cache username elements for better performance
+  const usernameElements = tweet.querySelectorAll(
+    'a[href^="/"]:not([href*="/status/"])',
+  );
+
+  for (const element of usernameElements) {
+    const href = element.getAttribute("href");
+    if (href && href.startsWith("/")) {
+      const username = href.split("/")[1]?.toLowerCase();
+      if (username && blockedUsers.includes(username)) {
+        debugLog(`Hiding tweet from blocked user: ${username}`);
+        return true;
       }
     }
+  }
 
-    // 3. LINK WORD BLOCKING (if not already hidden)
-    if (!shouldHide && linkBlockedWords.length > 0) {
-      const links = tweet.querySelectorAll("a[href]");
+  return false;
+}
 
-      for (const link of links) {
-        const href = (link.getAttribute("href") || "").toLowerCase();
+// Filter by General wordlist
+function shouldHideByGeneralWords(tweet) {
+  if (generalBlockedWords.length === 0) return false;
 
-        // Skip all Twitter/X links and mentions
-        if (
-          href.startsWith("/") || // Relative links
-          href.includes("twitter.com") ||
-          href.includes("x.com") ||
-          href.startsWith("#") || // Hashtags
-          href.startsWith("@") // Mentions
-        ) {
-          
-          continue;
-        }
+  const tweetText = tweet.textContent?.toLowerCase() || "";
 
-        try {
-          // Parse URL to properly check domains
-          const url = new URL(
-            href.startsWith("http") ? href : `https://${href}`,
+  for (const word of generalBlockedWords) {
+    if (tweetText.includes(word.toLowerCase())) {
+      const username = getUsernameFromTweet(tweet);
+      debugLog(`Hiding tweet containing "${word}" in post by ${username}`);
+
+      // Auto-collect user if enabled
+      if (autoCollectUsers && username) {
+        collectUserFromTweet(tweet);
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Filter by link wordlist
+function shouldHideByLinkWords(tweet) {
+  //Link words list is empty - skipping link check
+  if (linkBlockedWords.length === 0) { 
+    return false;
+  }
+
+  const links = tweet.querySelectorAll("a[href]");
+  let shouldHide = false;
+
+  for (const link of links) {
+    const href = (link.getAttribute("href") || "").toLowerCase();
+
+    // Skip all Twitter/X links and mentions
+    if (
+      href.startsWith("/") ||
+      href.includes("twitter.com") ||
+      href.includes("x.com") ||
+      href.startsWith("#") ||
+      href.startsWith("@")
+    ) {
+      continue;
+    }
+
+    try {
+      const url = new URL(href.startsWith("http") ? href : `https://${href}`);
+      const domain = url.hostname.replace("www.", "");
+
+      for (const word of linkBlockedWords) {
+        const lowerWord = word.toLowerCase();
+        if (domain.includes(lowerWord)) {
+          const username = getUsernameFromTweet(tweet);
+          debugLog(
+            `Found blocked link word "${word}" in domain ${domain} from @${username}`,
           );
-          const domain = url.hostname.replace("www.", "");
 
-          // Check each blocked word against domain only
-          for (const word of linkBlockedWords) {
-            const lowerWord = word.toLowerCase();
-
-            // Check if domain contains the blocked word
-            if (domain.includes(lowerWord)) {
-              shouldHide = true;
-              matchedWord = word;
-              matchType = "link domain match";
-              debugLog(`Blocked domain: ${domain} for word: ${word}`);
-              break;
-            }
+          if (autoCollectUsers && username) {
+            collectUserFromTweet(tweet);
           }
-        } catch (e) {
-          debugLog("Error parsing URL:", href, e);
-        }
 
-        if (shouldHide) break;
+          shouldHide = true;
+          break; // No need to check other words for this link
+        }
       }
+
+      if (shouldHide) break; // No need to check other links if we found a match
+    } catch (e) {
+      debugLog("Error parsing URL:", href, e);
     }
+  }
+  return shouldHide;
+}
 
-    tweet.dataset.processed = "true";
+// Helper function to collect username from tweet for auto-blocking
+function collectUserFromTweet(tweet) {
+  const userElement = tweet.querySelector(
+    '[data-testid="User-Name"] a[href^="/"]',
+  );
+  if (!userElement) return;
 
-    if (shouldHide) {
-      tweet.style.display = "none";
-      newlyHidden++;
-      debugLog(`Blocked tweet (${matchType}): ${matchedWord}`);
+  const username = userElement.getAttribute("href").split("/")[1];
+  if (!username || collectedUsers.includes(username)) return;
 
-      // AUTO-COLLECT USERNAMES
-      if (autoCollectUsers && matchType.includes("word match")) {
-        const userElement = tweet.querySelector(
-          '[data-testid="User-Name"] a[href^="/"]',
-        );
-        if (userElement) {
-          const username = userElement.getAttribute("href").split("/")[1];
-          if (!collectedUsers.includes(username)) {
-            collectedUsers.push(username);
-            chrome.storage.sync.get(["blockedUsers"], (result) => {
-              const currentBlocked = result.blockedUsers || [];
-              if (!currentBlocked.includes(username)) {
-                chrome.storage.sync.set(
-                  {
-                    blockedUsers: [...currentBlocked, username],
-                  },
-                  () => {
-                    debugLog(`Auto-added @${username} to blocked users`);
-                  },
-                );
-              }
-            });
-          }
-        }
-      }
+  collectedUsers.push(username);
+
+  chrome.storage.sync.get(["blockedUsers"], (result) => {
+    const currentBlocked = result.blockedUsers || [];
+    if (!currentBlocked.includes(username)) {
+      chrome.storage.sync.set(
+        { blockedUsers: [...currentBlocked, username] },
+        () => debugLog(`Auto-added @${username} to blocked users`),
+      );
     }
   });
-
-  if (newlyHidden > 0) {
-    hiddenTweetCount += newlyHidden;
-    updateCounterDisplay();
-  }
 }
 
 function observeTwitterFeed() {
@@ -240,35 +256,6 @@ function observeTwitterFeed() {
   }
 }
 
-function inspectTweetForDebugging(tweetId) {
-  const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-  tweets.forEach((tweet) => {
-    // Check if this is the tweet we're looking for
-    const links = tweet.querySelectorAll("a[href]");
-    let foundMatch = false;
-
-    links.forEach((link) => {
-      const href = link.getAttribute("href") || "";
-      if (href.includes(tweetId)) {
-        foundMatch = true;
-        console.log("FOUND TARGET TWEET:", tweet);
-        console.log("Tweet content:", tweet.textContent);
-        console.log("Links in tweet:");
-
-        tweet.querySelectorAll("a[href]").forEach((l) => {
-          console.log("  Link:", l.getAttribute("href"));
-        });
-
-        // Highlight the tweet for visual identification
-        tweet.style.border = "3px solid red";
-      }
-    });
-  });
-}
-
-// Call this with the tweet ID you want to inspect
-// e.g., inspectTweetForDebugging("1919766745725993286");
-
 function loadBlockedWords() {
   hiddenTweetCount = 0;
 
@@ -289,7 +276,8 @@ function loadBlockedWords() {
       autoCollectUsers = result.autoCollectUsers !== false;
       currentLang = result.language || "en";
 
-      debugLog("Loaded settings:", {
+      /*
+	  debugLog("Loaded settings:", {
         generalBlockedWords,
         linkBlockedWords,
         blockedUsers,
@@ -297,6 +285,7 @@ function loadBlockedWords() {
         autoCollectUsers,
         language: currentLang,
       });
+	  */
 
       hideTweets();
       observeTwitterFeed();
@@ -355,7 +344,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Add this CSS for animations
 const style = document.createElement("style");
 style.textContent = `
   @keyframes fadeIn {
