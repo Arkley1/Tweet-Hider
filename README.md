@@ -35,6 +35,8 @@ Tweet Hider is a Chrome extension designed to give you more control over your Tw
 ## Configuration
 You can update your lists directly in the extension’s settings:
 - **Usernames List:** Add or remove usernames whose tweets you want to avoid.
-- **Word List:** Input keywords that should trigger a tweet to be hidden, whether they appear in tweet text or within links.
+- **Word List:** Input keywords that should trigger a tweet to be hidden, whether they appear in tweet post or within links.
+
+If you want to see the output in console.log, change variable debugMode to true in content.js
 
 
