@@ -3,10 +3,19 @@ let notificationTimeout;
 let linkBlockedWords = [];
 let blockedUsers = [];
 let enableUserBlocking = false;
-let debugMode = false; // For output console log
+let debugMode = true; // For output console log
 let hiddenTweetCount = 0;
 let autoCollectUsers = true;
 let collectedUsers = []; // Track users we've found
+
+const hiddenTweetIds = new Set();
+
+const SELECTORS = {
+  TWEET: 'article[data-testid="tweet"], div[data-testid="tweet"]',
+  USERNAME: '[data-testid="User-Name"] a[href^="/"]',
+  TWEET_TEXT: 'div[data-testid="tweetText"], div[lang]:has(> span)',
+  LINKS: 'a[href]'
+};
 
 // Add these translations at the top of content.js
 const translations = {
@@ -64,45 +73,64 @@ function updateCounterDisplay() {
 
 // Tweet Hide Filter
 function hideTweets() {
-  const tweets = document.querySelectorAll(
-    'article[data-testid="tweet"]:not([data-processed="true"])',
-  );
+  const tweets = document.querySelectorAll(`
+    article[data-testid="tweet"]:not([data-tweet-hidden="true"]),
+    div[data-testid="tweet"]:not([data-tweet-hidden="true"])
+  `);
+
+  if (!tweets.length) return;
+
   let newlyHidden = 0;
+  const currentHiddenIds = new Set();
 
-  debugLog(`Checking ${tweets.length} new tweets`);
-
-  const processTweetBatch = (startIndex, batchSize) => {
-    const endIndex = Math.min(startIndex + batchSize, tweets.length);
-
-    for (let i = startIndex; i < endIndex; i++) {
+  // Process in batches with proper tracking
+  const processBatch = (start, end) => {
+    for (let i = start; i < end; i++) {
       const tweet = tweets[i];
-      tweet.dataset.processed = "true";
+      const tweetId = tweet.getAttribute('data-tweet-id') || 
+                     tweet.querySelector('a[href*="/status/"]')?.href.split('/').pop();
 
-      const hiddenByUsername = shouldHideByUsername(tweet);
-      const hiddenByGeneralWords = shouldHideByGeneralWords(tweet);
-      const hiddenByLinkWords = shouldHideByLinkWords(tweet);
+      // Skip if already hidden in this run or previous runs
+      if (!tweetId || hiddenTweetIds.has(tweetId)) continue;
 
-      if (hiddenByUsername || hiddenByGeneralWords || hiddenByLinkWords) {
-        if (tweet.style.display !== "none") {
-          tweet.style.display = "none";
-          newlyHidden++;
-        }
+      if (shouldHideTweet(tweet)) {
+        tweet.style.display = "none";
+        tweet.setAttribute('data-tweet-hidden', 'true');
+        hiddenTweetIds.add(tweetId);
+        newlyHidden++;
+        currentHiddenIds.add(tweetId);
       }
     }
 
-    if (endIndex < tweets.length) {
-      (window.requestIdleCallback || setTimeout)(() => {
-        processTweetBatch(endIndex, batchSize);
-      });
-    } else if (newlyHidden > 0) {
-      hiddenTweetCount += newlyHidden;
-      updateCounterDisplay();
+    if (end < tweets.length) {
+      requestAnimationFrame(() => processBatch(end, Math.min(end + 5, tweets.length)));
+    } else {
+      if (newlyHidden > 0) {
+        hiddenTweetCount += newlyHidden;
+        updateCounterDisplay();
+      }
+      // Clean up old IDs that are no longer in DOM
+      cleanupHiddenIds(currentHiddenIds);
     }
   };
 
-  if (tweets.length > 0) {
-    processTweetBatch(0, 10);
+  processBatch(0, Math.min(5, tweets.length));
+}
+
+function cleanupHiddenIds(currentIds) {
+  // Remove IDs of tweets that are no longer in DOM
+  for (const id of hiddenTweetIds) {
+    if (!currentIds.has(id) && !document.querySelector(`[data-tweet-id="${id}"]`)) {
+      hiddenTweetIds.delete(id);
+    }
   }
+}
+
+function shouldHideTweet(tweet) {
+  // Combined check with early returns
+  return shouldHideByUsername(tweet) || 
+         shouldHideByGeneralWords(tweet) || 
+         shouldHideByLinkWords(tweet);
 }
 
 // Helper function to get username from tweet
@@ -117,20 +145,20 @@ function getUsernameFromTweet(tweet) {
 function shouldHideByUsername(tweet) {
   if (!enableUserBlocking || blockedUsers.length === 0) return false;
 
-  // Cache username elements for better performance
-  const usernameElements = tweet.querySelectorAll(
-    'a[href^="/"]:not([href*="/status/"])',
-  );
+  // Cache the tweet's user element once per tweet
+  const userElement = tweet.querySelector('[data-testid="User-Name"]');
+  if (!userElement) return false;
 
-  for (const element of usernameElements) {
-    const href = element.getAttribute("href");
-    if (href && href.startsWith("/")) {
-      const username = href.split("/")[1]?.toLowerCase();
-      if (username && blockedUsers.includes(username)) {
-        debugLog(`Hiding tweet from blocked user: ${username}`);
-        return true;
-      }
-    }
+  // Get username from pre-queried element
+  const usernameLink = userElement.querySelector('a[href^="/"]');
+  if (!usernameLink) return false;
+
+  const href = usernameLink.getAttribute("href");
+  const username = href.split("/")[1]?.toLowerCase();
+  
+  if (username && blockedUsers.includes(username)) {
+    debugLog(`Hiding tweet from blocked user: ${username}`);
+    return true;
   }
 
   return false;
@@ -140,19 +168,28 @@ function shouldHideByUsername(tweet) {
 function shouldHideByGeneralWords(tweet) {
   if (generalBlockedWords.length === 0) return false;
 
-  const tweetText = tweet.textContent?.toLowerCase() || "";
+  // Single query for all text elements
+  const textElements = tweet.querySelectorAll('div[data-testid="tweetText"], div[lang]:has(> span)');
+  if (!textElements.length) return false;
 
-  for (const word of generalBlockedWords) {
-    if (tweetText.includes(word.toLowerCase())) {
-      const username = getUsernameFromTweet(tweet);
-      debugLog(`Hiding tweet containing "${word}" in post by ${username}`);
+  // Combine text once
+  const combinedText = Array.from(textElements)
+    .map(el => el.textContent || "")
+    .join(" ")
+    .toLowerCase();
 
-      // Auto-collect user if enabled
-      if (autoCollectUsers && username) {
-        collectUserFromTweet(tweet);
-      }
-      return true;
+  // Pre-process blocked words
+  const blockedTerms = generalBlockedWords.map(w => w.toLowerCase());
+
+  // Single check against all terms
+  if (blockedTerms.some(term => combinedText.includes(term))) {
+    const username = getUsernameFromTweet(tweet);
+    debugLog(`Hiding tweet containing blocked term in post by @${username}`);
+    
+    if (autoCollectUsers && username) {
+      collectUserFromTweet(tweet);
     }
+    return true;
   }
 
   return false;
@@ -160,25 +197,24 @@ function shouldHideByGeneralWords(tweet) {
 
 // Filter by link wordlist
 function shouldHideByLinkWords(tweet) {
-  //Link words list is empty - skipping link check
-  if (linkBlockedWords.length === 0) { 
-    return false;
-  }
+  if (linkBlockedWords.length === 0) return false;
 
+  // Cache all links once per tweet
   const links = tweet.querySelectorAll("a[href]");
-  let shouldHide = false;
+  if (!links.length) return false;
+
+  // Pre-process blocked words once
+  const blockedDomains = linkBlockedWords.map(w => w.toLowerCase());
 
   for (const link of links) {
     const href = (link.getAttribute("href") || "").toLowerCase();
 
-    // Skip all Twitter/X links and mentions
-    if (
-      href.startsWith("/") ||
-      href.includes("twitter.com") ||
-      href.includes("x.com") ||
-      href.startsWith("#") ||
-      href.startsWith("@")
-    ) {
+    // Skip Twitter links early
+    if (href.startsWith("/") || 
+        href.includes("twitter.com") || 
+        href.includes("x.com") ||
+        href.startsWith("#") || 
+        href.startsWith("@")) {
       continue;
     }
 
@@ -186,29 +222,21 @@ function shouldHideByLinkWords(tweet) {
       const url = new URL(href.startsWith("http") ? href : `https://${href}`);
       const domain = url.hostname.replace("www.", "");
 
-      for (const word of linkBlockedWords) {
-        const lowerWord = word.toLowerCase();
-        if (domain.includes(lowerWord)) {
-          const username = getUsernameFromTweet(tweet);
-          debugLog(
-            `Found blocked link word "${word}" in domain ${domain} from @${username}`,
-          );
-
-          if (autoCollectUsers && username) {
-            collectUserFromTweet(tweet);
-          }
-
-          shouldHide = true;
-          break; // No need to check other words for this link
+      // Check against pre-processed domains
+      if (blockedDomains.some(blocked => domain.includes(blocked))) {
+        const username = getUsernameFromTweet(tweet);
+        debugLog(`Found blocked link domain "${url}" from @${username}`);
+        
+        if (autoCollectUsers && username) {
+          collectUserFromTweet(tweet);
         }
+        return true;
       }
-
-      if (shouldHide) break; // No need to check other links if we found a match
     } catch (e) {
       debugLog("Error parsing URL:", href, e);
     }
   }
-  return shouldHide;
+  return false;
 }
 
 // Helper function to collect username from tweet for auto-blocking
@@ -234,26 +262,157 @@ function collectUserFromTweet(tweet) {
   });
 }
 
+let currentObserver = null;
+let lastKnownPath = window.location.pathname;
+let lastKnownContainer = null;
+
 function observeTwitterFeed() {
-  const twitterFeed =
-    document.querySelector('div[aria-label="Timeline: Your Home Timeline"]') ||
-    document.querySelector('main[role="main"]') ||
-    document.querySelector('div[data-testid="primaryColumn"]');
-
-  if (twitterFeed) {
-    const observer = new MutationObserver(function (mutations) {
-      hideTweets();
-    });
-
-    observer.observe(twitterFeed, {
-      childList: true,
-      subtree: true,
-    });
-
-    debugLog("Twitter feed observer set up");
-  } else {
-    setTimeout(observeTwitterFeed, 1000);
+  // Clear existing observer
+  if (currentObserver) {
+    currentObserver.disconnect();
+    currentObserver = null;
   }
+
+  const findTweetContainer = () => {
+    const selectors = [
+      'div[aria-label="Timeline: Your Home Timeline"] > div > div',
+      'div[aria-label="Timeline: Search timeline"] > div > div',
+      'div[aria-label="Timeline: Trending timeline"] > div > div',
+      'div[aria-label="Timeline: Profile timeline"] > div > div',
+      'div[data-testid="primaryColumn"] section[role="region"]',
+      'div[data-testid="primaryColumn"]'
+    ];
+
+    for (const selector of selectors) {
+      const container = document.querySelector(selector);
+      if (container) {
+        //debugLog(`Found container with selector: ${selector}`);
+        return container;
+      }
+    }
+    return null;
+  };
+
+  const tweetContainer = findTweetContainer();
+  
+  if (!tweetContainer) {
+    debugLog('Tweet container not found, retrying...');
+    setTimeout(observeTwitterFeed, 500);
+    return;
+  }
+
+  const handleMutations = (mutations) => {
+    // Check if URL changed (SPA navigation)
+    if (window.location.pathname !== lastKnownPath) {
+      lastKnownPath = window.location.pathname;
+      debugLog(`URL changed to: ${lastKnownPath}, reinitializing...`);
+      observeTwitterFeed();
+      return;
+    }
+
+    // Standard mutation handling
+    if (window.tweetHiderDebounce) {
+      clearTimeout(window.tweetHiderDebounce);
+    }
+    
+    window.tweetHiderDebounce = setTimeout(() => {
+      const needsCheck = mutations.some(mutation => {
+        return (mutation.addedNodes && mutation.addedNodes.length > 0) ||
+               (mutation.type === 'attributes' && mutation.attributeName === 'aria-label');
+      });
+      
+      if (needsCheck) {
+        debugLog('Processing mutations...');
+        hideTweets();
+      }
+    }, 100);
+  };
+  
+  const observer = new MutationObserver((mutations) => {
+    const hasNewTweets = mutations.some(mutation => {
+      return Array.from(mutation.addedNodes || []).some(node => {
+        return node.nodeType === 1 && (
+          node.matches('[data-testid="tweet"]') ||
+          node.querySelector('[data-testid="tweet"]')
+        );
+      });
+    });
+
+    if (hasNewTweets) {
+      hideTweets();
+    }
+  });
+  
+  currentObserver = new MutationObserver(handleMutations);
+  currentObserver.observe(tweetContainer, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['aria-label']
+  });
+
+  // Also observe the document body for URL changes
+  const urlObserver = new MutationObserver(() => {
+    if (window.location.pathname !== lastKnownPath) {
+      lastKnownPath = window.location.pathname;
+      debugLog(`URL changed to: ${lastKnownPath}, reinitializing...`);
+      observeTwitterFeed();
+    }
+  });
+
+  urlObserver.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  //debugLog('Observer initialized for current view');
+  hideTweets(); // Initial check
+}
+
+// Add periodic check for view changes
+setInterval(() => {
+  const currentContainer = document.querySelector('div[data-testid="primaryColumn"] section[role="region"]');
+  if (currentContainer && !currentContainer.isConnected) {
+    //debugLog('Container disconnected, reinitializing...');
+    observeTwitterFeed();
+  }
+}, 2000);
+
+// Initialize
+observeTwitterFeed();
+
+// Reset when page becomes visible
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    observeTwitterFeed();
+  }
+});
+
+function handleSPANavigation() {
+  const navObserver = new MutationObserver(() => {
+    if (!lastKnownContainer || !document.body.contains(lastKnownContainer)) {
+      //debugLog('SPA navigation detected, reinitializing...');
+      observeTwitterFeed();
+    }
+  });
+
+  navObserver.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
+// Initialize everything
+function initObserver() {
+  observeTwitterFeed();
+  handleSPANavigation();
+  
+  // Reset when page becomes visible again
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      observeTwitterFeed();
+    }
+  });
 }
 
 function loadBlockedWords() {
@@ -288,8 +447,8 @@ function loadBlockedWords() {
 	  */
 
       hideTweets();
-      observeTwitterFeed();
-      updateCounterDisplay();
+	  updateCounterDisplay();
+      initObserver();
     },
   );
 }
