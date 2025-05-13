@@ -1,156 +1,202 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Tweet Hider</title>
-  <style>
-    body {
-      width: 300px;
-      padding: 12px;
-      font-family: Arial, sans-serif;
-      font-size: 14px;
-    }
-    textarea {
-      resize: none;
-    }
-    h2 {
-      margin: 0 0 12px 0;
-      font-size: 16px;
-      color: #1DA1F2;
-    }
-    .section {
-      margin-bottom: 12px;
-    }
-    .section-title {
-      font-weight: bold;
-      margin-bottom: 6px;
-    }
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .checkbox-row input {
-      margin-right: 8px;
-    }
-    .wordlists {
-      display: flex;
-      gap: 10px;
-    }
-    .wordlist-column {
-      flex: 1;
-    }
-    textarea {
-      width: 100%;
-      height: 100px;
-      box-sizing: border-box;
-      padding: 6px;
-      font-family: Arial, sans-serif;
-      font-size: 13px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    .separator {
-      width: 1px;
-      background: #eee;
-    }
-    button {
-      background-color: #1DA1F2;
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      width: 100%;
-      font-weight: bold;
-      margin-top: 8px;
-    }
-    .save-message {
-      color: green;
-      margin-top: 8px;
-      font-size: 12px;
-      text-align: center;
-      font-weight: bold;
-    }
-	
-	.language-selector {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-    font-size: 14px;
-  }
-  .language-label {
-    margin-right: 8px;
-    color: #555;
-  }
-  .language-options {
-    display: flex;
-    align-items: center;
-  }
-  .language-option {
-    padding: 3px 6px;
-    cursor: pointer;
-    border-radius: 4px;
-    color: #888;
-  }
-  .language-option.active {
-    color: #1DA1F2;
-    font-weight: bold;
-  }
-  .language-option:hover:not(.active) {
-    background-color: #f0f0f0;
-  }
-  .language-divider {
-    margin: 0 8px;
-    color: #ccc;
-  }
-  </style>
-</head>
-<body>
-  <div class="language-selector">
-  <span class="language-label" id="LanguageLabel">Language:</span>
-  <div class="language-options">
-    <span id="lang-en" class="language-option active">English</span>
-    <span class="language-divider">|</span>
-    <span id="lang-id" class="language-option">Bahasa Indonesia</span>
-  </div>
-</div>
-  <h2>Tweet Hider</h2>
-  
-  <div class="checkbox-row">
-    <input type="checkbox" id="enableUserBlocking">
-    <label for="enableUserBlocking" id="userBlockingLabel">Hide tweets from these users:</label>
-  </div>
-  
-  <div class="section">
-    <textarea id="blockedUsers" placeholder="Enter usernames (one per line)&#10;Example:&#10;spamuser1&#10;fakeaccount2"></textarea>
-  </div>
+  <head>
+    <title>Tweet Hider</title>
+    <style>
+      body {
+        width: 300px;
+        padding: 12px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+      textarea {
+        resize: none;
+      }
+      h2 {
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        color: #1da1f2;
+      }
+      .section {
+        margin-bottom: 12px;
+      }
+      .section-title {
+        font-weight: bold;
+        margin-bottom: 6px;
+      }
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .checkbox-row input {
+        margin-right: 8px;
+      }
+      .wordlists {
+        display: flex;
+        gap: 10px;
+      }
+      .wordlist-column {
+        flex: 1;
+      }
+      textarea {
+        width: 100%;
+        height: 100px;
+        box-sizing: border-box;
+        padding: 6px;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .separator {
+        width: 1px;
+        background: #eee;
+      }
+      button {
+        background-color: #1da1f2;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        width: 100%;
+        font-weight: bold;
+        margin-top: 8px;
+      }
+      .save-message {
+        color: green;
+        margin-top: 8px;
+        font-size: 12px;
+        text-align: center;
+        font-weight: bold;
+      }
 
-  <div class="section">
-    <div class="wordlists">
-      <div class="wordlist-column">
-        <div class="section-title">Hide tweets containing:</div>
-        <textarea id="generalBlockedWords" placeholder="Example:&#10;nsfw&#10;porn&#10;spoiler&#10;xxx"></textarea>
-      </div>
-      <div class="separator"></div>
-      <div class="wordlist-column">
-        <div class="section-title">Hide links containing:</div>
-        <textarea id="linkBlockedWords" placeholder="Example:&#10;dood&#10;linktr&#10;shorturl"></textarea>
+      .language-selector {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        font-size: 14px;
+      }
+      .language-label {
+        margin-right: 8px;
+        color: #555;
+      }
+      .language-options {
+        display: flex;
+        align-items: center;
+      }
+      .language-option {
+        padding: 3px 6px;
+        cursor: pointer;
+        border-radius: 4px;
+        color: #888;
+      }
+      .language-option.active {
+        color: #1da1f2;
+        font-weight: bold;
+      }
+      .language-option:hover:not(.active) {
+        background-color: #f0f0f0;
+      }
+      .language-divider {
+        margin: 0 8px;
+        color: #ccc;
+      }
+      .tooltip {
+        position: relative;
+        display: inline-block;
+        margin-left: 4px;
+        cursor: help;
+      }
+
+      .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 200px;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 12px;
+        font-weight: normal;
+      }
+
+      .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="language-selector">
+      <span class="language-label" id="LanguageLabel">Language:</span>
+      <div class="language-options">
+        <span id="lang-en" class="language-option active">English</span>
+        <span class="language-divider">|</span>
+        <span id="lang-id" class="language-option">Bahasa Indonesia</span>
       </div>
     </div>
-  </div>
-  
-<div class="section">
+    <h2>Tweet Hider</h2>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="enableUserBlocking" />
+      <label for="enableUserBlocking" id="userBlockingLabel"
+        >Hide tweets from these users:</label
+      >
+    </div>
+
+    <div class="section">
+      <textarea
+        id="blockedUsers"
+        placeholder="Enter usernames (one per line)&#10;Example:&#10;spamuser1&#10;fakeaccount2"
+      ></textarea>
+    </div>
+
+    <div class="section">
+      <div class="wordlists">
+        <div class="wordlist-column">
+          <div class="section-title">Hide tweets containing:</div>
+          <textarea
+            id="generalBlockedWords"
+            placeholder="Example:&#10;nsfw&#10;porn&#10;spoiler&#10;xxx"
+          ></textarea>
+        </div>
+        <div class="separator"></div>
+        <div class="wordlist-column">
+          <div class="section-title">Hide links containing:</div>
+          <textarea
+            id="linkBlockedWords"
+            placeholder="Example:&#10;dood&#10;linktr&#10;shorturl"
+          ></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="checkbox-row">
     <input type="checkbox" id="autoCollectUsers" checked>
-    <label for="autoCollectUsers" id="autoCollectUsersLabel">Automatically hide users who post blocked words</label>
+    <label for="autoCollectUsers" id="autoCollectUsersLabel">
+        <span class="label-text">Automatically hide users who post blocked words</span>
+        <span class="tooltip">&#8505;
+            <span class="tooltiptext">This may block users based on quoted content</span>
+        </span>
+    </label>
 </div>
 
-  <button id="saveButton">Save Changes</button>
-  
-  <div class="stats">
-    <p>Counter resets when you refresh the page.</p>
-    <p>Refresh X/Twitter after saving to apply changes.</p>
-  </div>
-  
-  <script src="popup.js"></script>
-</body>
+    <button id="saveButton">Save Changes</button>
+
+    <div class="stats">
+      <p>Counter resets when you refresh the page.</p>
+      <p>Refresh X/Twitter after saving to apply changes.</p>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
 </html>

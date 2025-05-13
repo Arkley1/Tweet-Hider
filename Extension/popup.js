@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       document.getElementById("autoCollectUsers").checked =
         result.autoCollectUsers !== false;
+	  
     },
   );
 
@@ -136,6 +137,7 @@ const translations = {
     statsReset: "Counter resets when you refresh the page.",
     statsRefresh: "Refresh X/Twitter after saving to apply changes.",
     linkPlaceholder: "Example:\ndood\nvidbe\nt.me",
+	autoCollectTooltip: "This may also block users based on quoted/retweeted content containing blocked words"
   },
   id: {
 	title: "Sembunyikan Tweet",
@@ -153,6 +155,7 @@ const translations = {
     statsRefresh:
       "Segarkan X/Twitter setelah menyimpan untuk menerapkan perubahan.",
     linkPlaceholder: "Contoh:\ndood\nvidbe\nt.me",
+	autoCollectTooltip: "Ini juga dapat memblokir pengguna berdasarkan konten yang dikutip/retweet yang berisi kata-kata yang diblokir"
   },
 };
 
@@ -206,10 +209,11 @@ function translateUI() {
   document.getElementById('blockedUsers').placeholder = t.userPlaceholder;
   document.getElementById('generalBlockedWords').placeholder = t.generalPlaceholder;
   document.getElementById('linkBlockedWords').placeholder = t.linkPlaceholder;
-  document.getElementById('autoCollectUsersLabel').textContent = t.autoCollect;
   document.getElementById('saveButton').textContent = t.saveButton;
   document.querySelectorAll('.section-title')[0].textContent = t.generalWordsLabel;
   document.querySelectorAll('.section-title')[1].textContent = t.linkWordsLabel;
+  document.querySelector("#autoCollectUsersLabel .label-text").textContent = t.autoCollect;
+  document.querySelector("#autoCollectUsersLabel .tooltiptext").textContent = t.autoCollectTooltip;
   
   const statsLines = document.querySelectorAll(".stats p");
   statsLines[0].textContent = t.statsReset;
@@ -236,74 +240,4 @@ function showMessage(text, color) {
   document.body.appendChild(saveMsg);
 
   setTimeout(() => saveMsg.remove(), 3000);
-}
-
-// Export block lists to JSON file
-function exportBlockLists() {
-  chrome.storage.sync.get(
-    [
-      "generalBlockedWords",
-      "linkBlockedWords",
-      "blockedUsers",
-      "enableUserBlocking",
-    ],
-    function (result) {
-      const data = {
-        version: 1,
-        generalWords: result.generalBlockedWords || [],
-        linkWords: result.linkBlockedWords || [],
-        users: result.blockedUsers || [],
-        userBlockingEnabled: result.enableUserBlocking || false,
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "twitter_blocker_export.json";
-      a.click();
-
-      URL.revokeObjectURL(url);
-      showMessage("Block lists exported successfully!", "green");
-    },
-  );
-}
-
-// Import block lists from JSON file
-function handleFileImport(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    try {
-      const data = JSON.parse(e.target.result);
-
-      // Validate the imported data
-      if (!data.version || data.version !== 1) {
-        throw new Error("Invalid file format");
-      }
-
-      // Update UI with imported data
-      document.getElementById("generalBlockedWords").value = (
-        data.generalWords || []
-      ).join("\n");
-      document.getElementById("linkBlockedWords").value = (
-        data.linkWords || []
-      ).join("\n");
-      document.getElementById("blockedUsers").value = (data.users || []).join(
-        "\n",
-      );
-      document.getElementById("enableUserBlocking").checked =
-        data.userBlockingEnabled || false;
-
-      showMessage("Block lists imported successfully!", "green");
-    } catch (err) {
-      showMessage("Error importing file: " + err.message, "red");
-    }
-  };
-  reader.readAsText(file);
 }
