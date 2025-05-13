@@ -133,6 +133,51 @@
         visibility: visible;
         opacity: 1;
       }
+	  .switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+  }
+  
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+  }
+  
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+  }
+  
+  input:checked + .slider {
+    background-color: #1da1f2;
+  }
+  
+  input:checked + .slider:before {
+    transform: translateX(26px);
+  }
+	  
     </style>
   </head>
   <body>
@@ -196,6 +241,16 @@
       <p>Counter resets when you refresh the page.</p>
       <p>Refresh X/Twitter after saving to apply changes.</p>
     </div>
+	
+<div class="setting-item">
+  <label id="debug-toggle-label" class="toggle-label">
+    <span class="label-text">Debug Mode</span>
+  </label>
+  <label class="switch">
+    <input type="checkbox" id="debug-toggle">
+    <span class="slider round"></span>
+  </label>
+</div>
 
     <script src="popup.js"></script>
   </body>
