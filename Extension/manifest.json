@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tweet Hider",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Hides tweets containing specific words or links",
   "permissions": [
     "storage",
