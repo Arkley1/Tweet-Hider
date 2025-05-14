@@ -340,57 +340,86 @@ function shouldHideByGeneralWords(tweet) {
 
 // Filter by link wordlist
 function shouldHideByLinkWords(tweet) {
-  if (linkBlockedWords.length === 0) return false;
+    if (linkBlockedWords.length === 0) return false;
+    
+    const links = tweet.querySelectorAll("a[href]");
+    if (!links.length) return false;
 
-  const links = tweet.querySelectorAll("a[href]");
-  if (!links.length) return false;
-
-  const blockedDomains = linkBlockedWords.map((w) => w.toLowerCase());
-
-  for (const link of links) {
-    const href = (link.getAttribute("href") || "").toLowerCase();
-
-    // Skip Twitter links early
-    if (
-      href.startsWith("/") ||
-      href.includes("twitter.com") ||
-      href.includes("x.com") ||
-      href.startsWith("#") ||
-      href.startsWith("@")
-    ) {
-      continue;
-    }
-
-    try {
-      const url = new URL(href.startsWith("http") ? href : `https://${href}`);
-      const domain = url.hostname.replace("www.", "");
-
-      if (debugMode) {
-        // Debug mode - find and log exact matched domain
-        const matchedDomain = blockedDomains.find((d) => domain.includes(d));
-        if (matchedDomain) {
-          const username = getUsernameFromTweet(tweet);
-          debugLog(
-            `Found blocked link domain "${matchedDomain}" in "${url}" from @${username}`,
-          );
-          if (autoCollectUsers && username) collectUserFromTweet(tweet);
-          return true;
+    const blockedDomains = linkBlockedWords.map(w => w.toLowerCase());
+    
+    for (const link of links) {
+        const href = (link.getAttribute("href") || "").toLowerCase();
+        
+        // Skip internal Twitter links and anchors
+        if (href.startsWith("/") || href.includes("twitter.com") || 
+            href.includes("x.com") || href.startsWith("#") || 
+            href.startsWith("@") || href.startsWith("mailto:")) {
+            continue;
         }
-      } else {
-        // Production mode - use some() for maximum performance
-        if (blockedDomains.some((d) => domain.includes(d))) {
-          const username = getUsernameFromTweet(tweet);
-          if (autoCollectUsers && username) collectUserFromTweet(tweet);
-          return true;
+
+        try {
+            // Handle t.co redirect links by checking both the href and visible text
+            let urlText = href;
+            const linkText = link.textContent?.toLowerCase() || "";
+            
+            // If it's a t.co link, check the displayed text instead
+            if (href.includes("t.co/") && linkText) {
+                urlText = linkText;
+            }
+            
+            // Extract domain from both href and visible text
+            const domainsToCheck = [];
+            
+            // Check the href first
+            if (href.startsWith("http")) {
+                const url = new URL(href);
+                domainsToCheck.push(url.hostname.replace("www.", ""));
+            } else if (!href.includes("t.co/")) {
+                // For non-http links that aren't t.co, try to parse as URL
+                try {
+                    const url = new URL(`https://${href}`);
+                    domainsToCheck.push(url.hostname.replace("www.", ""));
+                } catch (e) {
+                    // If parsing fails, just check the text as-is
+                    domainsToCheck.push(href);
+                }
+            }
+            
+            // Check the visible link text if different from href
+            if (linkText && linkText !== href) {
+                try {
+                    const textUrl = linkText.startsWith("http") ? 
+                        new URL(linkText) : new URL(`https://${linkText}`);
+                    domainsToCheck.push(textUrl.hostname.replace("www.", ""));
+                } catch (e) {
+                    domainsToCheck.push(linkText);
+                }
+            }
+
+            // Check all collected domains against blocked words
+            for (const domain of domainsToCheck) {
+                if (debugMode) {
+                    const matchedDomain = blockedDomains.find(d => domain.includes(d));
+                    if (matchedDomain) {
+                        const username = getUsernameFromTweet(tweet);
+                        debugLog(`Found blocked link domain "${matchedDomain}" in "${domain}" from @${username}`);
+                        if (autoCollectUsers && username) collectUserFromTweet(tweet);
+                        return true;
+                    }
+                } else {
+                    if (blockedDomains.some(d => domain.includes(d))) {
+                        const username = getUsernameFromTweet(tweet);
+                        if (autoCollectUsers && username) collectUserFromTweet(tweet);
+                        return true;
+                    }
+                }
+            }
+        } catch (e) {
+            debugMode && debugLog("Error parsing URL:", href, e);
         }
-      }
-    } catch (e) {
-      debugMode && debugLog("Error parsing URL:", href, e);
     }
-  }
-  return false;
+    return false;
 }
-
 // Helper function to collect username from tweet for auto-blocking
 function collectUserFromTweet(tweet) {
   const userElement = tweet.querySelector(
